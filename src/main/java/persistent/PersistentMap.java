@@ -35,19 +35,18 @@ public class PersistentMap<K, V> {
             }
         }
 
-        SubMap subMap = new SubMap();
+        SubMap subMap = null; //new SubMap();
         if (levelTo == 7) {
             // Key collision occurred:
             levelTo--;
             KeyValue<K, V> oldKv = new KeyValue<>(oldKeyValue.key(), oldKeyValue.value());
             KeyValue<K, V> newKv = new KeyValue<>(key, value);
             newKv.next(oldKv);
-            subMap = subMap.set(subhashForLevel(oldHashCode, levelTo--), newKv);
+            subMap = new SubMap(subhashForLevel(oldHashCode, levelTo--), newKv);
         } else {
             KeyValue<K, V> newKv = new KeyValue<>(key, value);
             // Todo: Remove unnecessary copy:
-            subMap = subMap.set(subhashForLevel(newHashCode, levelTo), newKv);
-            subMap = subMap.set(subhashForLevel(oldHashCode, levelTo--), oldKeyValue);
+            subMap = new SubMap(subhashForLevel(newHashCode, levelTo), newKv, subhashForLevel(oldHashCode, levelTo--), oldKeyValue);
         }
 
         while (levelTo > levelFrom) {
@@ -234,6 +233,36 @@ public class PersistentMap<K, V> {
         public SubMap(int mask, Object[] hashArray) {
             this.mask = mask;
             this.hashArray = hashArray;
+        }
+
+        public <K, V> SubMap(int bucket, KeyValue<K, V> keyValue) {
+            this.hashArray = new Object[1];
+            this.hashArray[0] = keyValue;
+            this.mask = setBit(0, bucket);;
+        }
+
+        public <K, V> SubMap(int bucket1, KeyValue<K, V> keyValue1, int bucket2, KeyValue<K, V> keyValue2) {
+            this.hashArray = new Object[2];
+            if (bucket1 < bucket2) {
+                int mask = 0;
+                this.hashArray[0] = keyValue1;
+                mask = setBit(mask, bucket1);
+
+                this.hashArray[1] = keyValue2;
+                mask = setBit(mask, bucket2);
+
+                this.mask = mask;
+            } else {
+                int mask = 0;
+
+                this.hashArray[0] = keyValue2;
+                mask = setBit(mask, bucket2);
+
+                this.hashArray[1] = keyValue1;
+                mask = setBit(mask, bucket1);
+
+                this.mask = mask;
+            }
         }
 
         public boolean isEmpty() {
