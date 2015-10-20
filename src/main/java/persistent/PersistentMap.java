@@ -35,7 +35,7 @@ public class PersistentMap<K, V> {
             }
         }
 
-        SubMap subMap = null; //new SubMap();
+        SubMap subMap = null;
         if (levelTo == 7) {
             // Key collision occurred:
             levelTo--;
@@ -45,7 +45,6 @@ public class PersistentMap<K, V> {
             subMap = new SubMap(subhashForLevel(oldHashCode, levelTo--), newKv);
         } else {
             KeyValue<K, V> newKv = new KeyValue<>(key, value);
-            // Todo: Remove unnecessary copy:
             subMap = new SubMap(subhashForLevel(newHashCode, levelTo), newKv, subhashForLevel(oldHashCode, levelTo--), oldKeyValue);
         }
 
@@ -78,6 +77,13 @@ public class PersistentMap<K, V> {
         return new PersistentMap<>(newRoot, elements + 1);
     }
 
+    private V valueFromChain(KeyValue<K, V> keyValue, K key) {
+        while (keyValue != null && !keyValue.key().equals(key)) {
+            keyValue = keyValue.next();
+        }
+        return keyValue != null ? keyValue.value() : null;
+    }
+
     private V lookup(SubMap root, int level, K key, int hashCode) {
         int bucket = subhashForLevel(hashCode, level);
 
@@ -97,19 +103,20 @@ public class PersistentMap<K, V> {
         }
     }
 
-    private V valueFromChain(KeyValue<K, V> keyValue, K key) {
-        while (keyValue != null && !keyValue.key().equals(key)) {
-            keyValue = keyValue.next();
-        }
-        return keyValue != null ? keyValue.value() : null;
-    }
-
     public V get(K key) {
         if (root == null) {
             return null;
         }
 
         return lookup(root, 0, key, key.hashCode());
+    }
+
+    private String prefix(int level) {
+        String prefix = " |";
+        for (int i = 0; i < level; i++) {
+            prefix += "       |";
+        }
+        return prefix;
     }
 
     private void dumpLevel(StringBuilder builder, SubMap root, int level) {
@@ -140,19 +147,6 @@ public class PersistentMap<K, V> {
         }
     }
 
-    private String prefix(int level) {
-        String prefix = " |";
-        for (int i = 0; i < level; i++) {
-            prefix += "       |";
-        }
-        return prefix;
-    }
-
-    public String metrics() {
-        // No-op
-        return "";
-    }
-
     public String dump() {
         StringBuilder builder = new StringBuilder("Root:\n");
         if (root == null) {
@@ -165,7 +159,6 @@ public class PersistentMap<K, V> {
         return builder.toString();
     }
 
-
     public boolean isEmpty() {
         return elements == 0;
     }
@@ -174,9 +167,14 @@ public class PersistentMap<K, V> {
         return elements;
     }
 
+    public String metrics() {
+        // No-op
+        return "";
+    }
+
 
     public PersistentMap<K, V> remove(K key) {
-        return null;
+        throw new NotImplementedException();
     }
 
     public Object nodeAt(int level, int hashCode) {
@@ -225,7 +223,7 @@ public class PersistentMap<K, V> {
         final private int mask;
 
         public SubMap() {
-            // Todo: is this necessary to create an array of zero objects?
+            // Todo: is it necessary to create an array of zero objects?
             this.hashArray = new Object[0];
             this.mask = 0;
         }
@@ -266,15 +264,7 @@ public class PersistentMap<K, V> {
         }
 
         public boolean isEmpty() {
-            if (capacity() == 0) {
-                return true;
-            }
-            for (int i = 0; i < capacity(); i++) {
-                if (hashArray[i] != null) {
-                    return false;
-                }
-            }
-            return true;
+            return capacity() == 0 || mask == 0;
         }
 
         public void removeEntry(int bucket) {
@@ -295,7 +285,7 @@ public class PersistentMap<K, V> {
         }
 
         public SubMap<K, V> set(int bucket, Object entry) {
-            assert (bitClear(mask, bucket));
+//            assert (bitClear(mask, bucket));
 
             Object[] newHashArray = Arrays.copyOf(hashArray, capacity() + 1);
             int newMask = setBit(mask, bucket);
@@ -307,7 +297,7 @@ public class PersistentMap<K, V> {
         }
 
         public SubMap<K, V> replace(int bucket, Object entry) {
-            assert (bitSet(mask, bucket));
+//            assert (bitSet(mask, bucket));
 
             int newMask = setBit(mask, bucket);
             Object[] newHashArray = Arrays.copyOf(hashArray, capacity());
@@ -355,7 +345,7 @@ public class PersistentMap<K, V> {
     }
 
     public static int subhashForLevel(int hash, int level) {
-        assert (level <= 6);
+//        assert (level <= 6);
 
         if (level < 6) {
             int rshift = 32 - (5 + level * 5);
