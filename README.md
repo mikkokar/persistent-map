@@ -27,5 +27,5 @@ It supports all the basic operations:
   String barVal = v4.get("bar")
   ```
   
-See the PersistentMapTest for usage examples.  
+See the PersistentMapTest.java for usage examples.  
   
