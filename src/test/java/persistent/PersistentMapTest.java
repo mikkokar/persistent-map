@@ -86,7 +86,7 @@ public class PersistentMapTest {
         assertThat(v3.get(keyC), is(nullValue()));
     }
 
-    @Test(enabled = false)
+    @Test
     public void removesKeyValueFromRoot() {
         PersistentMap<TestKey, String> v1 = new PersistentMap<>();
 
@@ -105,7 +105,7 @@ public class PersistentMapTest {
         assertThat(v5.size(), is(0));
     }
 
-    @Test(enabled = false)
+    @Test
     public void removesOneOfManyKeyValuesFromSubMap() {
         // Leaves ohter key-values in the SubMap .
 

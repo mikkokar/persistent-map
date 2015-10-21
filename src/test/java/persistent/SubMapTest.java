@@ -1,7 +1,8 @@
 package persistent;
 
-import persistent.PersistentMap.SubMap;
 import org.testng.annotations.Test;
+import persistent.PersistentMap.KeyValue;
+import persistent.PersistentMap.SubMap;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
@@ -86,23 +87,65 @@ public class SubMapTest {
         assertThat(v4.isPresent(31), is(true));
     }
 
-    @Test
-    public void testBitPosition() {
-        assertThat(SubMap.bitSet(1, 0), is(true));
-        assertThat(SubMap.bitSet(1, 1), is(false));
-        assertThat(SubMap.bitSet(1, 31), is(false));
+    /*
+                // [  5  4  3  2  1  0 ]
+                //          x
+                // [     4  3  2  1  0 ]  new_1
+                //
 
-        assertThat(SubMap.bitSet(0x80000000, 31), is(true));
-        assertThat(SubMap.bitSet(0x80000000, 0), is(false));
-        assertThat(SubMap.bitSet(0x80000000, 30), is(false));
+     */
+    @Test
+    public void remove_assertsWhenAttemptToRemoveFromEmptyMap() {
+        // Todo;
     }
 
     @Test
-    public void testSetBit() {
-        assertThat(SubMap.setBit(0x80000001, 0), is(0x80000001));
-        assertThat(SubMap.setBit(0x80000001, 31), is(0x80000001));
+    public void remove_returnsEmptySubmapWhenLastEntryIsRemoved() {
+        SubMap v1 = new SubMap(1, new KeyValue<>("Foo", "bar"));
+        SubMap v2 = v1.removeEntry(1);
+        assertThat(v2.isEmpty(), is(true));
+        assertThat(v2.capacity(), is(0));
+    }
 
-        assertThat(SubMap.setBit(0x80000001, 1), is(0x80000003));
+    @Test
+    public void remove_removesLowestEntry() {
+        KeyValue<String, String> kv1 = new KeyValue<>("Foo", "this");
+        KeyValue<String, String> kv2 = new KeyValue<>("Bar", "that");
+
+        SubMap v1 = new SubMap(1, kv1, 2, kv2);
+        SubMap v2 = v1.removeEntry(1);
+        assertThat(v2.get(2), is(kv2));
+        assertThat(v2.get(1), is(nullValue()));
+        assertThat(v2.capacity(), is(1));
+    }
+
+    @Test
+    public void remove_removesHighestEntry() {
+        KeyValue<String, String> kv1 = new KeyValue<>("Foo", "this");
+        KeyValue<String, String> kv2 = new KeyValue<>("Bar", "that");
+
+        SubMap v1 = new SubMap(1, kv1, 2, kv2);
+        SubMap v2 = v1.removeEntry(2);
+        assertThat(v2.get(1), is(kv1));
+        assertThat(v2.get(2), is(nullValue()));
+        assertThat(v2.capacity(), is(1));
+    }
+
+    @Test
+    public void remove_removesEntryInTheMiddle() {
+        KeyValue<String, String> kv1 = new KeyValue<>("Foo", "this");
+        KeyValue<String, String> kv2 = new KeyValue<>("Bar", "that");
+        KeyValue<String, String> kv3 = new KeyValue<>("Baz", "this and that");
+
+        SubMap v1 = new SubMap(1, kv1, 2, kv2);
+        SubMap v2 = v1.set(3, kv3);
+
+        SubMap v3 = v2.removeEntry(2);
+
+        assertThat(v3.get(1), is(kv1));
+        assertThat(v3.get(2), is(nullValue()));
+        assertThat(v3.get(3), is(kv3));
+        assertThat(v3.capacity(), is(2));
     }
 
     @Test
