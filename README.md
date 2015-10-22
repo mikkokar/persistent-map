@@ -10,7 +10,10 @@ It supports all the basic operations:
   - Addition of new elements:
   
   ```
-  PersistentMap<String, String> v1 = new PersistentMap<>();
+  // To create a new empty persistent map:
+  PersistentMap<String, String> v1 = PersistentMap.create();
+  
+  // Add elements:
   PersistentMap<String, String> v2 = v1.put("foo", "this");
   PersistentMap<String, String> v3 = v2.put("bar", "that");
   ```
@@ -29,3 +32,18 @@ It supports all the basic operations:
   
 See the PersistentMapTest.java for usage examples.  
   
+Installation:
+
+  ```
+  mvn clean install
+  ```
+  
+After installing, use the following Maven coordinates:
+
+  ```
+  <dependency>
+      <groupId>com.persistent</groupId>
+      <artifactId>persistent</artifactId>
+      <version>1.0-SNAPSHOT</version>
+  </dependency>
+  ```
