@@ -15,7 +15,7 @@ public class SubMapTest {
 
     @Test
     public void settingEntryReturnsNewCopy() {
-        SubMap v1 = new SubMap();
+        SubMap v1 = SubMap.create();
 
         SubMap v2 = v1.set(3, "foo");
         assertThat(v1.isEmpty(), is(true));
@@ -29,7 +29,7 @@ public class SubMapTest {
 
     @Test
     public void settingEntryUpdatesBitPopulationCount() {
-        SubMap v1 = new SubMap();
+        SubMap v1 = SubMap.create();
 
         SubMap v2 = v1.set(3, "foo-3");
         assertThat(v1.isEmpty(), is(true));
@@ -56,7 +56,7 @@ public class SubMapTest {
 
     @Test
     public void replacingEntryUpdatesBitPopulationCount() {
-        SubMap v1 = new SubMap();
+        SubMap v1 = SubMap.create();
 
         SubMap v2 = v1.set(3, "foo-3");
         SubMap v3 = v2.set(5, "foo-5");
@@ -70,7 +70,7 @@ public class SubMapTest {
 
     @Test
     public void exposesPresenseOfEntryAtIndex() {
-        SubMap v1 = new SubMap();
+        SubMap v1 = SubMap.create();
         SubMap v2 = v1.set(3, "foo-3");
         SubMap v3 = v2.set(7, "foo-7");
         SubMap v4 = v3.set(31, "foo-31");
@@ -151,6 +151,5 @@ public class SubMapTest {
     @Test
     public void testPopulationCount() {
         assertThat(PersistentMap.populationCountAt(0xF0000001, 31), is(4));
-
     }
 }

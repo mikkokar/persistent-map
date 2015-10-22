@@ -31,7 +31,7 @@ public class PersistentMapTest {
 
     @Test
     public void insertsObjectInEmptyMap() {
-        PersistentMap<String, String> v1 = new PersistentMap<>();
+        PersistentMap<String, String> v1 = PersistentMap.create();
         assertThat(v1.isEmpty(), is(true));
         assertThat(v1.size(), is(0));
 
@@ -44,7 +44,7 @@ public class PersistentMapTest {
 
     @Test
     public void replacesExistingKeyValueEntryWithSubmap() {
-        PersistentMap<TestKey, String> v1 = new PersistentMap<>();
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
 
         TestKey keyA = hashCodes.key(5, 3, 0, 0, 0, 0, 0, "a");
         TestKey keyB = hashCodes.key(5, 2, 0, 0, 0, 0, 0, "b");
@@ -67,7 +67,7 @@ public class PersistentMapTest {
 
     @Test
     public void resolvesHashKeyCollisions() {
-        PersistentMap<TestKey, String> v1 = new PersistentMap<>();
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
 
         TestKey keyA = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "a");
         TestKey keyB = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "b");
@@ -88,7 +88,7 @@ public class PersistentMapTest {
 
     @Test
     public void removesKeyValueFromRoot() {
-        PersistentMap<TestKey, String> v1 = new PersistentMap<>();
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
 
         TestKey keyA = hashCodes.key(4, 0, 0, 0, 0, 0, 0, "a");
         TestKey keyB = hashCodes.key(5, 0, 0, 0, 0, 0, 0, "b");
@@ -109,7 +109,7 @@ public class PersistentMapTest {
     public void removesOneOfManyKeyValuesFromSubMap() {
         // Leaves ohter key-values in the SubMap .
 
-        PersistentMap<TestKey, String> v1 = new PersistentMap<>();
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
 
         TestKey keyA = hashCodes.key(1, 4, 0, 0, 0, 0, 0, "a");
         TestKey keyB = hashCodes.key(1, 5, 0, 0, 0, 0, 0, "b");
@@ -126,11 +126,9 @@ public class PersistentMapTest {
         assertThat(v5.size(), is(0));
     }
 
-    @Test(enabled = false)
+    @Test
     public void removesLeafSubmap() {
-        // Submap can be removed too.
-
-        PersistentMap<TestKey, String> v1 = new PersistentMap<>();
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
 
         TestKey keyA = hashCodes.key(1, 2, 4, 0, 0, 0, 0, "a");
         TestKey keyB = hashCodes.key(1, 2, 5, 0, 0, 0, 0, "b");
@@ -146,12 +144,14 @@ public class PersistentMapTest {
         assertThat(v5.get(keyB), is(nullValue()));
         assertThat(v5.size(), is(0));
 
+        System.out.println("version 5: " + v5.dump());
+
         assertThat(v5.nodeAt(1, makeHash(1, 2, 0, 0, 0, 0, 0)), is(nullValue()));
         assertThat(v5.nodeAt(0, makeHash(1, 2, 0, 0, 0, 0, 0)), is(notNullValue()));
     }
 
     @Test
-    public void createsSubmapChainWhenKeysCollide() {
+    public void insertCollidingKeys_createsSubmapChainWhenKeysCollide() {
         /*
          *  level:  0  1  2  3  4  5  6
          *  keyA:   7  6  5  4  3  2  1
@@ -166,7 +166,7 @@ public class PersistentMapTest {
         TestKey keyB = hashCodes.key(7, 6, 5, 4, 3, 2, 1, "b");
         KeyValue<TestKey, String> oldKv = new KeyValue<>(keyA, "a");
 
-        SubMap root = new SubMap();
+        SubMap root = SubMap.create();
 
         root = root.set(7, insertCollidingKeys(0, oldKv, keyB, "b"));
 
@@ -185,7 +185,7 @@ public class PersistentMapTest {
     }
 
     @Test
-    public void createsSubmapChainWhenKeysCollide_starting_from_level1() {
+    public void insertCollidingKeys_createsSubmapChainWhenKeysCollide_starting_from_level1() {
 
         /*
          *  level:  0  1  2  3  4  5  6
@@ -202,7 +202,7 @@ public class PersistentMapTest {
         TestKey keyB = hashCodes.key(7, 6, 5, 4, 3, 2, 1, "b");
         KeyValue<TestKey, String> oldKv = new KeyValue<>(keyA, "a");
 
-        SubMap root = new SubMap();
+        SubMap root = SubMap.create();
 
         root = root.set(6, insertCollidingKeys(1, oldKv, keyB, "b"));
 
@@ -220,7 +220,7 @@ public class PersistentMapTest {
     }
 
     @Test
-    public void createsSubmapChainWhenKeysCollide_starting_from_level_diff1() {
+    public void insertCollidingKeys_createsSubmapChainWhenKeysCollide_starting_from_level_diff1() {
         /*
          *  level:  0  1  2  3  4  5  6
          *  keyA:   7  6  4  0  0  0  0
@@ -236,7 +236,7 @@ public class PersistentMapTest {
         TestKey keyB = hashCodes.key(0, 6, 5, 0, 0, 0, 0, "b");
         KeyValue<TestKey, String> oldKv = new KeyValue<>(keyA, "a");
 
-        SubMap root = new SubMap();
+        SubMap root = SubMap.create();
 
         root = root.set(6, insertCollidingKeys(1, oldKv, keyB, "b"));
 
@@ -253,7 +253,7 @@ public class PersistentMapTest {
 
     @Test
     public void stressTestMap() {
-        PersistentMap<String, String> hamt = new PersistentMap<>();
+        PersistentMap<String, String> hamt = PersistentMap.create();
 
         Map<String, String> refMap = new HashMap<>();
         for (int i = 0; i < 12000; i++) {

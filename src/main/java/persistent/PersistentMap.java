@@ -13,11 +13,20 @@ import static persistent.Bits.setBit;
 
 public class PersistentMap<K, V> {
     private static final int SUBHASH_MASK = 31;
+    private static final PersistentMap EMPTY_MAP = new PersistentMap();
 
     private final SubMap root;
     private final int elements;
 
-    public PersistentMap() {
+
+    /**
+     * Creates an empty persistent map
+     */
+    public static <K, V> PersistentMap<K, V> create() {
+        return (PersistentMap<K, V>)EMPTY_MAP;
+    }
+
+    private PersistentMap() {
         this(null, 0);
     }
 
@@ -53,13 +62,13 @@ public class PersistentMap<K, V> {
         }
 
         while (levelTo > levelFrom) {
-            subMap = new SubMap<>().set(subhashForLevel(newHashCode, levelTo--), subMap);
+            subMap = SubMap.create().set(subhashForLevel(newHashCode, levelTo--), subMap);
         }
 
         return subMap;
     }
 
-    private SubMap<K, V> insert(SubMap root, int level, K key, V value, int hashCode) {
+    private SubMap insert(SubMap root, int level, K key, V value, int hashCode) {
         int bucket = subhashForLevel(hashCode, level);
 
         Object entry = root.get(bucket);
@@ -70,44 +79,32 @@ public class PersistentMap<K, V> {
             SubMap newSubMap = insertCollidingKeys(level, oldKeyValue, key, value);
             return root.replace(bucket, newSubMap);
         } else {
-            SubMap<K, V> newSubmap = insert((SubMap) entry, level + 1, key, value, hashCode);
+            SubMap newSubmap = insert((SubMap) entry, level + 1, key, value, hashCode);
             return root.replace(bucket, newSubmap);
         }
     }
 
     public PersistentMap<K, V> put(K key, V value) {
-        SubMap<K, V> mapRoot = root != null ? root : new SubMap<>();
-        SubMap<K, V> newRoot = insert(mapRoot, 0, key, value, key.hashCode());
+        SubMap mapRoot = root != null ? root : SubMap.create();
+        SubMap newRoot = insert(mapRoot, 0, key, value, key.hashCode());
         return new PersistentMap<>(newRoot, elements + 1);
     }
 
-    /*
-                  Root
-       root ----> sub1 ----> sub2 ---> Kv
-        |          |          |
-        |copy      |          |
-        |          |          |
-        v          v          v
-       root_1 --> sub1_1 --> sub2_2
-
-     */
-
-    private SubMap<K, V> removeKey(SubMap root, int level, K key) {
+    private SubMap removeKey(SubMap root, int level, K key) {
         int hashCode = key.hashCode();
         int bucket = subhashForLevel(hashCode, level);
 
         Object entry = root.get(bucket);
         if (isKeyValue(entry)) {
-            SubMap<K, V> copy = root.removeEntry(bucket);
-            return copy;
+            return root.removeEntry(bucket);
         } else if (isSubmap(entry)) {
-            SubMap<K, V> subMap = (SubMap<K, V>) entry;
-            SubMap<K, V> copy = removeKey(subMap, level + 1, key);
-            return root.replace(bucket, copy);
-//            return root.removeEntry(bucket);
-//            if (subMap.isEmpty()) {
-//                root.removeEntry(bucket);
-//            }
+            SubMap subMap = (SubMap) entry;
+            SubMap copy = removeKey(subMap, level + 1, key);
+            if (copy != null && copy.isEmpty()) {
+                return root.removeEntry(bucket);
+            } else {
+                return root.replace(bucket, copy);
+            }
         }
 
         return null;
@@ -118,7 +115,7 @@ public class PersistentMap<K, V> {
             return this;
         }
 
-        SubMap<K, V> newRoot = removeKey(root, 0, key);
+        SubMap newRoot = removeKey(root, 0, key);
         if (newRoot != null) {
             return new PersistentMap<>(newRoot, elements - 1);
         } else {
@@ -270,13 +267,17 @@ public class PersistentMap<K, V> {
     }
 
     @VisibleForTesting
-    static class SubMap<K, V> {
-        final private Object[] hashArray;
-        final private int mask;
-
+    static class SubMap {
         public static SubMap EMPTY_SUBMAP = new SubMap();
 
-        public SubMap() {
+        final private int mask;
+        final private Object[] hashArray;
+
+        public static SubMap create() {
+            return EMPTY_SUBMAP;
+        }
+
+        private SubMap() {
             // Todo: is it necessary to create an array of zero objects?
             this.hashArray = new Object[0];
             this.mask = 0;
@@ -291,7 +292,6 @@ public class PersistentMap<K, V> {
             this.hashArray = new Object[1];
             this.hashArray[0] = keyValue;
             this.mask = setBit(0, bucket);
-            ;
         }
 
         public <K, V> SubMap(int bucket1, KeyValue<K, V> keyValue1, int bucket2, KeyValue<K, V> keyValue2) {
@@ -322,7 +322,7 @@ public class PersistentMap<K, V> {
             return capacity() == 0 || mask == 0;
         }
 
-        public SubMap<K, V> removeEntry(int bucket) {
+        public SubMap removeEntry(int bucket) {
             assert (bitSet(mask, bucket));
 
             if (capacity() > 1) {
@@ -331,7 +331,7 @@ public class PersistentMap<K, V> {
                 int entryIndex = populationCountAt(newMask, bucket);
 
                 System.arraycopy(hashArray, entryIndex + 1, newHashArray, entryIndex, capacity() - (entryIndex + 1));
-                return new SubMap<>(newMask, newHashArray);
+                return new SubMap(newMask, newHashArray);
             }
 
             return EMPTY_SUBMAP;
@@ -350,7 +350,7 @@ public class PersistentMap<K, V> {
             return hashArray.length;
         }
 
-        public SubMap<K, V> set(int bucket, Object entry) {
+        public SubMap set(int bucket, Object entry) {
             assert (bitClear(mask, bucket));
 
             Object[] newHashArray = Arrays.copyOf(hashArray, capacity() + 1);
@@ -359,10 +359,10 @@ public class PersistentMap<K, V> {
             newHashArray[entryIndex] = entry;
             System.arraycopy(hashArray, entryIndex, newHashArray, entryIndex + 1, capacity() - entryIndex);
 
-            return new SubMap<>(newMask, newHashArray);
+            return new SubMap(newMask, newHashArray);
         }
 
-        public SubMap<K, V> replace(int bucket, Object entry) {
+        public SubMap replace(int bucket, Object entry) {
             assert (bitSet(mask, bucket));
 
             int newMask = setBit(mask, bucket);
@@ -371,7 +371,7 @@ public class PersistentMap<K, V> {
             int entryIndex = populationCountAt(mask, bucket);
             newHashArray[entryIndex] = entry;
 
-            return new SubMap<>(newMask, newHashArray);
+            return new SubMap(newMask, newHashArray);
         }
 
         public boolean isPresent(int bucket) {
