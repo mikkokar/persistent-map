@@ -2,7 +2,13 @@ package persistent;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static java.lang.String.format;
 import static persistent.Bits.bitClear;
@@ -11,7 +17,7 @@ import static persistent.Bits.clearBit;
 import static persistent.Bits.setBit;
 
 
-public class PersistentMap<K, V> {
+public final class PersistentMap<K, V> {
     private static final int SUBHASH_MASK = 31;
     private static final PersistentMap EMPTY_MAP = new PersistentMap();
 
@@ -23,7 +29,7 @@ public class PersistentMap<K, V> {
      * Creates an empty persistent map
      */
     public static <K, V> PersistentMap<K, V> create() {
-        return (PersistentMap<K, V>)EMPTY_MAP;
+        return (PersistentMap<K, V>) EMPTY_MAP;
     }
 
     private PersistentMap() {
@@ -36,8 +42,8 @@ public class PersistentMap<K, V> {
     }
 
     @VisibleForTesting
-    static <K, V> SubMap insertCollidingKeys(int levelFrom, KeyValue<K, V> oldKeyValue, K key, V value) {
-        int oldHashCode = oldKeyValue.key().hashCode();
+    static <K, V> SubMap insertCollidingKeys(int levelFrom, KeyEntry<K, V> oldKeyEntry, K key, V value) {
+        int oldHashCode = oldKeyEntry.key().hashCode();
         int newHashCode = key.hashCode();
         int levelTo;
         for (levelTo = levelFrom + 1; levelTo <= 6; levelTo++) {
@@ -52,13 +58,13 @@ public class PersistentMap<K, V> {
         if (levelTo == 7) {
             // Key collision occurred:
             levelTo--;
-            KeyValue<K, V> oldKv = new KeyValue<>(oldKeyValue.key(), oldKeyValue.value());
-            KeyValue<K, V> newKv = new KeyValue<>(key, value);
+            KeyEntry<K, V> oldKv = new KeyEntry<>(oldKeyEntry.key(), oldKeyEntry.value());
+            KeyEntry<K, V> newKv = new KeyEntry<>(key, value);
             newKv.next(oldKv);
             subMap = new SubMap(subhashForLevel(oldHashCode, levelTo--), newKv);
         } else {
-            KeyValue<K, V> newKv = new KeyValue<>(key, value);
-            subMap = new SubMap(subhashForLevel(newHashCode, levelTo), newKv, subhashForLevel(oldHashCode, levelTo--), oldKeyValue);
+            KeyEntry<K, V> newKv = new KeyEntry<>(key, value);
+            subMap = new SubMap(subhashForLevel(newHashCode, levelTo), newKv, subhashForLevel(oldHashCode, levelTo--), oldKeyEntry);
         }
 
         while (levelTo > levelFrom) {
@@ -73,10 +79,10 @@ public class PersistentMap<K, V> {
 
         Object entry = root.get(bucket);
         if (isVacant(entry)) {
-            return root.set(bucket, new KeyValue<>(key, value));
+            return root.set(bucket, new KeyEntry<>(key, value));
         } else if (isKeyValue(entry)) {
-            KeyValue<K, V> oldKeyValue = (KeyValue<K, V>) entry;
-            SubMap newSubMap = insertCollidingKeys(level, oldKeyValue, key, value);
+            KeyEntry<K, V> oldKeyEntry = (KeyEntry<K, V>) entry;
+            SubMap newSubMap = insertCollidingKeys(level, oldKeyEntry, key, value);
             return root.replace(bucket, newSubMap);
         } else {
             SubMap newSubmap = insert((SubMap) entry, level + 1, key, value, hashCode);
@@ -123,11 +129,11 @@ public class PersistentMap<K, V> {
         }
     }
 
-    private V valueFromChain(KeyValue<K, V> keyValue, K key) {
-        while (keyValue != null && !keyValue.key().equals(key)) {
-            keyValue = keyValue.next();
+    private V valueFromChain(KeyEntry<K, V> keyEntry, K key) {
+        while (keyEntry != null && !keyEntry.key().equals(key)) {
+            keyEntry = keyEntry.next();
         }
-        return keyValue != null ? keyValue.value() : null;
+        return keyEntry != null ? keyEntry.value() : null;
     }
 
     private V lookup(SubMap root, int level, K key, int hashCode) {
@@ -137,11 +143,11 @@ public class PersistentMap<K, V> {
         if (isVacant(entry)) {
             return null;
         } else if (isKeyValue(entry)) {
-            KeyValue<K, V> keyValue = ((KeyValue<K, V>) entry);
+            KeyEntry<K, V> keyEntry = ((KeyEntry<K, V>) entry);
             if (level < 6) {
-                return hashCode == keyValue.key().hashCode() ? keyValue.value() : null;
+                return hashCode == keyEntry.key().hashCode() ? keyEntry.value() : null;
             } else {
-                return valueFromChain(keyValue, key);
+                return valueFromChain(keyEntry, key);
             }
         } else {
             SubMap subMap = (SubMap) entry;
@@ -166,45 +172,6 @@ public class PersistentMap<K, V> {
         return prefix;
     }
 
-    private void dumpLevel(StringBuilder builder, SubMap root, int level) {
-        for (int i = 0; i < 32; i++) {
-            if (!root.isPresent(i)) {
-                continue;
-            }
-            Object entry = root.get(i);
-            if (isVacant(entry)) {
-                builder.append(prefix(level));
-                builder.append(format("- %02d: %s", i, "ERROR - vacant entry"));
-                builder.append('\n');
-                continue;
-            }
-
-            if (isKeyValue(entry)) {
-                builder.append(prefix(level));
-                KeyValue<K, V> keyValue = (KeyValue<K, V>) entry;
-                builder.append(format("- %02d: %s", i, keyValue.toString()));
-                builder.append('\n');
-            } else {
-                builder.append(prefix(level));
-                builder.append(format("- %02d: SubMap", i));
-                builder.append('\n');
-
-                dumpLevel(builder, (SubMap) entry, level + 1);
-            }
-        }
-    }
-
-    public String dump() {
-        StringBuilder builder = new StringBuilder("Root:\n");
-        if (root == null) {
-            builder.append("<empty>");
-            return builder.toString();
-        }
-
-        dumpLevel(builder, root, 0);
-
-        return builder.toString();
-    }
 
     public boolean isEmpty() {
         return elements == 0;
@@ -230,32 +197,93 @@ public class PersistentMap<K, V> {
         return desired;
     }
 
+    public Set<K> keySet() {
+        if (root == null) {
+            return Collections.emptySet();
+        }
+        MapWalker<K, V, Set<K>> walker = new MapWalker<>(
+                (keySet, level, bucket, kvEntry, subMapEntry) -> keySet.add(kvEntry.getKey()),
+                MapWalker.noAction(),
+                MapWalker.noAction());
+
+        return walker.walk(new HashSet<>(), root);
+    }
+
+    public List<V> values() {
+        if (root == null) {
+            return Collections.emptyList();
+        }
+        MapWalker<K, V, List<V>> walker = new MapWalker<>(
+                (values, level, bucket, kvEntry, subMapEntry) -> values.add(kvEntry.getValue()),
+                MapWalker.noAction(),
+                MapWalker.noAction());
+
+        return walker.walk(new ArrayList<>(), root);
+    }
+
+    public Set<Map.Entry<K, V>> entrySet() {
+        if (root == null) {
+            return Collections.emptySet();
+        }
+        MapWalker<K, V, Set<Map.Entry<K, V>>> walker = new MapWalker<>(
+                (entries, level, bucket, kvEntry, subMapEntry) -> entries.add(kvEntry),
+                MapWalker.noAction(),
+                MapWalker.noAction());
+
+        return walker.walk(new HashSet<>(), root);
+    }
+
+    public String dump() {
+        if (root == null) {
+            return "Root:\n<empty>";
+        }
+
+        MapWalker<K, V, StringBuilder> walker = new MapWalker<>(
+                (builder, level, bucket, mapEntry, subMapEntry) -> {
+                    builder.append(prefix(level));
+                    builder.append(format("- %02d: %s", bucket, mapEntry.toString()));
+                    builder.append('\n');
+                },
+                (builder, level, bucket, mapEntry, subMapEntry) -> {
+                    builder.append(prefix(level));
+                    builder.append(format("- %02d: SubMap", bucket));
+                    builder.append('\n');
+                },
+                (builder, level, bucket, mapEntry, subMapEntry) -> {
+                    builder.append(prefix(level));
+                    builder.append(format("- %02d: %s", bucket, "ERROR - vacant entry"));
+                    builder.append('\n');
+                });
+
+        return walker.walk(new StringBuilder("Root:\n"), root).toString();
+    }
+
     @VisibleForTesting
-    static class KeyValue<K, V> {
+    static class KeyEntry<K, V> implements Map.Entry<K, V> {
         private final K key;
         private final V value;
-        private KeyValue<K, V> next;
+        private KeyEntry<K, V> next;
 
-        public KeyValue(K key, V value) {
+        public KeyEntry(K key, V value) {
             this.key = key;
             this.value = value;
             this.next = null;
         }
 
-        public void next(KeyValue<K, V> nextValue) {
+        void next(KeyEntry<K, V> nextValue) {
             this.next = nextValue;
         }
 
-        public KeyValue<K, V> next() {
+        KeyEntry<K, V> next() {
             return next;
         }
 
-        public K key() {
-            return key;
+        K key() {
+            return getKey();
         }
 
-        public V value() {
-            return value;
+        V value() {
+            return getValue();
         }
 
         @Override
@@ -263,6 +291,21 @@ public class PersistentMap<K, V> {
             String nextStr = next != null ? " -> " + next.toString() : "";
             int hashCode = key.hashCode();
             return format("KeyValue(%d [%s], %s)%s", hashCode, hashToDottedString(hashCode), value, nextStr);
+        }
+
+        @Override
+        public K getKey() {
+            return key;
+        }
+
+        @Override
+        public V getValue() {
+            return value;
+        }
+
+        @Override
+        public V setValue(V value) {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -288,30 +331,30 @@ public class PersistentMap<K, V> {
             this.hashArray = hashArray;
         }
 
-        public <K, V> SubMap(int bucket, KeyValue<K, V> keyValue) {
+        public <K, V> SubMap(int bucket, KeyEntry<K, V> keyEntry) {
             this.hashArray = new Object[1];
-            this.hashArray[0] = keyValue;
+            this.hashArray[0] = keyEntry;
             this.mask = setBit(0, bucket);
         }
 
-        public <K, V> SubMap(int bucket1, KeyValue<K, V> keyValue1, int bucket2, KeyValue<K, V> keyValue2) {
+        public <K, V> SubMap(int bucket1, KeyEntry<K, V> keyEntry1, int bucket2, KeyEntry<K, V> keyEntry2) {
             this.hashArray = new Object[2];
             if (bucket1 < bucket2) {
                 int mask = 0;
-                this.hashArray[0] = keyValue1;
+                this.hashArray[0] = keyEntry1;
                 mask = setBit(mask, bucket1);
 
-                this.hashArray[1] = keyValue2;
+                this.hashArray[1] = keyEntry2;
                 mask = setBit(mask, bucket2);
 
                 this.mask = mask;
             } else {
                 int mask = 0;
 
-                this.hashArray[0] = keyValue2;
+                this.hashArray[0] = keyEntry2;
                 mask = setBit(mask, bucket2);
 
-                this.hashArray[1] = keyValue1;
+                this.hashArray[1] = keyEntry1;
                 mask = setBit(mask, bucket1);
 
                 this.mask = mask;
@@ -379,16 +422,17 @@ public class PersistentMap<K, V> {
         }
     }
 
-    private boolean isSubmap(Object entry) {
+
+    private static boolean isSubmap(Object entry) {
         return entry instanceof SubMap;
     }
 
-    private boolean isVacant(Object entry) {
+    private static boolean isVacant(Object entry) {
         return entry == null;
     }
 
-    private boolean isKeyValue(Object entry) {
-        return entry instanceof KeyValue;
+    private static boolean isKeyValue(Object entry) {
+        return entry instanceof KeyEntry;
     }
 
     public static int populationCountAt(int mask, int bucket) {
@@ -407,21 +451,59 @@ public class PersistentMap<K, V> {
         }
     }
 
-    public static String hashToDottedString(int hashCode) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(subhashForLevel(hashCode, 0));
-        sb.append(".");
-        sb.append(subhashForLevel(hashCode, 1));
-        sb.append(".");
-        sb.append(subhashForLevel(hashCode, 2));
-        sb.append(".");
-        sb.append(subhashForLevel(hashCode, 3));
-        sb.append(".");
-        sb.append(subhashForLevel(hashCode, 4));
-        sb.append(".");
-        sb.append(subhashForLevel(hashCode, 5));
-        sb.append(".");
-        sb.append(subhashForLevel(hashCode, 6));
-        return sb.toString();
+    private static String hashToDottedString(int hashCode) {
+        return String.valueOf(subhashForLevel(hashCode, 0)) +
+                "." + subhashForLevel(hashCode, 1) +
+                "." + subhashForLevel(hashCode, 2) +
+                "." + subhashForLevel(hashCode, 3) +
+                "." + subhashForLevel(hashCode, 4) +
+                "." + subhashForLevel(hashCode, 5) +
+                "." + subhashForLevel(hashCode, 6);
+    }
+
+    interface MapWalkerEventAction<K, V, C> {
+        void walkerEvent(C context, int level, int bucket, KeyEntry<K, V> keyValue, SubMap subMap);
+    }
+
+    private static class MapWalker<K, V, C> {
+        private final MapWalkerEventAction<K, V, C> kvAction;
+        private final MapWalkerEventAction<K, V, C> subMapAction;
+        private final MapWalkerEventAction<K, V, C> vacantAction;
+
+        public MapWalker(MapWalkerEventAction<K, V, C> kvAction,
+                         MapWalkerEventAction<K, V, C> subMapAction,
+                         MapWalkerEventAction<K, V, C> vacantAction) {
+            this.kvAction = kvAction;
+            this.subMapAction = subMapAction;
+            this.vacantAction = vacantAction;
+        }
+
+        public static <K, V, C> MapWalkerEventAction<K, V, C> noAction() {
+            return (keySet, level, bucket, kvEntry, subMapEntry) -> {
+            };
+        }
+
+        public C walk(C context, SubMap root) {
+            return walk(context, root, 0);
+        }
+
+        private C walk(C context, SubMap root, int level) {
+            for (int i = 0; i < 32; i++) {
+                if (!root.isPresent(i)) {
+                    continue;
+                }
+
+                Object entry = root.get(i);
+                if (isKeyValue(entry)) {
+                    kvAction.walkerEvent(context, level, i, (KeyEntry<K, V>) entry, null);
+                } else if (isSubmap(entry)) {
+                    subMapAction.walkerEvent(context, level, i, null, (SubMap) entry);
+                    walk(context, (SubMap) entry, level + 1);
+                } else {
+                    vacantAction.walkerEvent(context, level, i, null, (SubMap) root);
+                }
+            }
+            return context;
+        }
     }
 }

@@ -1,26 +1,26 @@
 package persistent;
 
-import persistent.PersistentMap.KeyValue;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+import persistent.PersistentMap.KeyEntry;
 import persistent.PersistentMap.SubMap;
 import persistent.support.HashCodes;
 import persistent.support.HashCodes.TestKey;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
-import static persistent.PersistentMap.insertCollidingKeys;
-import static persistent.support.HashCodes.makeHash;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static persistent.PersistentMap.insertCollidingKeys;
+import static persistent.support.HashCodes.makeHash;
 
-/**
- *
- */
 public class PersistentMapTest {
     private HashCodes hashCodes;
 
@@ -107,7 +107,7 @@ public class PersistentMapTest {
 
     @Test
     public void removesOneOfManyKeyValuesFromSubMap() {
-        // Leaves ohter key-values in the SubMap .
+        // Leaves other key-values in the SubMap .
 
         PersistentMap<TestKey, String> v1 = PersistentMap.create();
 
@@ -158,13 +158,13 @@ public class PersistentMapTest {
          *  keyB:   7  6  5  4  3  2  1
          *          ^                 ^
          *          |                 |
-         *       root              full
+         *       root               key
          *                    collision
          */
 
         TestKey keyA = hashCodes.key(7, 6, 5, 4, 3, 2, 1, "a");
         TestKey keyB = hashCodes.key(7, 6, 5, 4, 3, 2, 1, "b");
-        KeyValue<TestKey, String> oldKv = new KeyValue<>(keyA, "a");
+        KeyEntry<TestKey, String> oldKv = new KeyEntry<>(keyA, "a");
 
         SubMap root = SubMap.create();
 
@@ -176,7 +176,7 @@ public class PersistentMapTest {
         SubMap subMap4 = (SubMap) subMap3.get(4);
         SubMap subMap5 = (SubMap) subMap4.get(3);
         SubMap subMap6 = (SubMap) subMap5.get(2);
-        KeyValue<TestKey, String> kvNew = (KeyValue<TestKey, String>) subMap6.get(1);
+        KeyEntry<TestKey, String> kvNew = (KeyEntry<TestKey, String>) subMap6.get(1);
 
         assertThat(kvNew.key(), is(keyB));
         assertThat(kvNew.value(), is("b"));
@@ -193,14 +193,14 @@ public class PersistentMapTest {
          *  keyB:   7  6  5  4  3  2  1
          *          ^  ^              ^
          *          |  |              |
-         *       root  |           full
+         *       root  |            key
          *             |      collision
          *         start
          */
 
         TestKey keyA = hashCodes.key(7, 6, 5, 4, 3, 2, 1, "a");
         TestKey keyB = hashCodes.key(7, 6, 5, 4, 3, 2, 1, "b");
-        KeyValue<TestKey, String> oldKv = new KeyValue<>(keyA, "a");
+        KeyEntry<TestKey, String> oldKv = new KeyEntry<>(keyA, "a");
 
         SubMap root = SubMap.create();
 
@@ -211,7 +211,7 @@ public class PersistentMapTest {
         SubMap subMap4 = (SubMap) subMap3.get(4);
         SubMap subMap5 = (SubMap) subMap4.get(3);
         SubMap subMap6 = (SubMap) subMap5.get(2);
-        KeyValue<TestKey, String> kvNew = (KeyValue<TestKey, String>) subMap6.get(1);
+        KeyEntry<TestKey, String> kvNew = (KeyEntry<TestKey, String>) subMap6.get(1);
 
         assertThat(kvNew.key(), is(keyB));
         assertThat(kvNew.value(), is("b"));
@@ -234,15 +234,15 @@ public class PersistentMapTest {
          */
         TestKey keyA = hashCodes.key(0, 6, 4, 0, 0, 0, 0, "a");
         TestKey keyB = hashCodes.key(0, 6, 5, 0, 0, 0, 0, "b");
-        KeyValue<TestKey, String> oldKv = new KeyValue<>(keyA, "a");
+        KeyEntry<TestKey, String> oldKv = new KeyEntry<>(keyA, "a");
 
         SubMap root = SubMap.create();
 
         root = root.set(6, insertCollidingKeys(1, oldKv, keyB, "b"));
 
         SubMap subMap2 = (SubMap) root.get(6);
-        KeyValue<TestKey, String> kv4 = (KeyValue<TestKey, String>) subMap2.get(4);
-        KeyValue<TestKey, String> kv5 = (KeyValue<TestKey, String>) subMap2.get(5);
+        KeyEntry<TestKey, String> kv4 = (KeyEntry<TestKey, String>) subMap2.get(4);
+        KeyEntry<TestKey, String> kv5 = (KeyEntry<TestKey, String>) subMap2.get(5);
 
         assertThat(kv4.key(), is(keyA));
         assertThat(kv5.key(), is(keyB));
@@ -250,6 +250,69 @@ public class PersistentMapTest {
         //        assertThat(kvNew.next(), is(oldKv));
     }
 
+    @Test
+    public void enumeratesAllStoredKeys() {
+        PersistentMap<TestKey, String> map = PersistentMap.create();
+        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 0, "a"), "a");
+        map = map.put(hashCodes.key(0, 6, 4, 1, 0, 0, 0, "b"), "b");
+        map = map.put(hashCodes.key(0, 6, 4, 2, 0, 0, 0, "c"), "c");
+//        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 0, "d"), "d");
+        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 1, "d"), "d");
+        map = map.put(hashCodes.key(0, 6, 4, 0, 7, 0, 0, "e"), "e");
+
+        System.out.println("Map: " + map.dump());
+
+        Set<TestKey> keySet = map.keySet();
+
+        assertThat(keySet, containsInAnyOrder(
+                        hashCodes.key(0, 6, 4, 0, 0, 0, 0, "a"),
+                        hashCodes.key(0, 6, 4, 0, 0, 0, 0, "b"),
+                        hashCodes.key(0, 6, 4, 0, 0, 0, 0, "c"),
+                        hashCodes.key(0, 6, 4, 0, 0, 0, 0, "d"),
+                        hashCodes.key(0, 6, 4, 0, 0, 0, 0, "e"))
+        );
+
+    }
+
+    @Test
+    public void enumeratesAllStoredValues() {
+        PersistentMap<TestKey, String> map = PersistentMap.create();
+        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 0, "a"), "a");
+        map = map.put(hashCodes.key(0, 6, 4, 1, 0, 0, 0, "b"), "b");
+        map = map.put(hashCodes.key(0, 6, 4, 2, 0, 0, 0, "c"), "c");
+//        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 0, "d"), "d");
+        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 1, "d"), "d");
+        map = map.put(hashCodes.key(0, 6, 4, 0, 7, 0, 0, "e"), "e");
+
+        System.out.println("Map: " + map.dump());
+
+        List<String> values = map.values();
+
+        assertThat(values, containsInAnyOrder("a", "b", "c", "d", "e"));
+    }
+
+    @Test(enabled = false) // Todo: Mikko: Must implement equalsTo() & hashCode() for MapEntry.
+    public void enumeratesAllMapEntries() {
+        PersistentMap<TestKey, String> map = PersistentMap.create();
+        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 0, "a"), "a");
+        map = map.put(hashCodes.key(0, 6, 4, 1, 0, 0, 0, "b"), "b");
+        map = map.put(hashCodes.key(0, 6, 4, 2, 0, 0, 0, "c"), "c");
+//        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 0, "d"), "d");
+        map = map.put(hashCodes.key(0, 6, 4, 0, 0, 0, 1, "d"), "d");
+        map = map.put(hashCodes.key(0, 6, 4, 0, 7, 0, 0, "e"), "e");
+
+        System.out.println("Map: " + map.dump());
+
+        Set<? extends Map.Entry<TestKey, String>> entrySet = map.entrySet();
+
+        assertThat(entrySet, containsInAnyOrder(
+                new KeyEntry<>(hashCodes.key(0, 6, 4, 0, 0, 0, 0, "a"), "a"),
+                new KeyEntry<>(hashCodes.key(0, 6, 4, 1, 0, 0, 0, "b"), "b"),
+                new KeyEntry<>(hashCodes.key(0, 6, 4, 2, 0, 0, 0, "c"), "c"),
+                new KeyEntry<>(hashCodes.key(0, 6, 4, 0, 0, 0, 1, "d"), "d"),
+                new KeyEntry<>(hashCodes.key(0, 6, 4, 0, 7, 0, 0, "e"), "e")
+        ));
+    }
 
     @Test
     public void stressTestMap() {
@@ -276,6 +339,7 @@ public class PersistentMapTest {
     }
 
     Random r = new Random();
+
     private String randomString() {
         return String.format("%04x%04x%04x%04x", r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt());
     }
