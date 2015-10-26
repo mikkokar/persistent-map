@@ -66,7 +66,44 @@ public class PersistentMapTest {
     }
 
     @Test
+    public void keyAlreadyExists() {
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
+
+        TestKey keyB = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "b");
+
+        PersistentMap<TestKey, String> v2 = v1.put(keyB, "B");
+        PersistentMap<TestKey, String> v3 = v1.put(keyB, "B2");
+
+        // Todo: replace the existing value?
+    }
+
+    @Test
     public void resolvesHashKeyCollisions() {
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
+
+        TestKey keyA = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "a");
+        TestKey keyB = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "b");
+        TestKey keyC = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "c");
+
+        assertThat(keyB.equals(keyC), is(false));
+
+
+        PersistentMap<TestKey, String> v2 = v1.put(keyA, "a");
+        PersistentMap<TestKey, String> v3 = v2.put(keyB, "b");
+        PersistentMap<TestKey, String> v4 = v3.put(keyC, "c");
+
+        assertThat(v4.isEmpty(), is(false));
+        assertThat(v4.size(), is(3));
+
+        System.out.println(v4.dump());
+
+        assertThat(v4.get(keyA), is("a"));
+        assertThat(v4.get(keyB), is("b"));
+        assertThat(v4.get(keyC), is("c"));
+    }
+
+    @Test
+    public void removesEntryFromMiddleOfCollisionChaing() {
         PersistentMap<TestKey, String> v1 = PersistentMap.create();
 
         TestKey keyA = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "a");
@@ -75,15 +112,75 @@ public class PersistentMapTest {
 
         PersistentMap<TestKey, String> v2 = v1.put(keyA, "a");
         PersistentMap<TestKey, String> v3 = v2.put(keyB, "b");
+        PersistentMap<TestKey, String> v4 = v3.put(keyC, "c");
 
-        assertThat(v3.isEmpty(), is(false));
-        assertThat(v3.size(), is(2));
+        PersistentMap<TestKey, String> v5 = v4.remove(keyB);
 
-        System.out.println(v3.dump());
+        System.out.println(v5.dump());
 
-        assertThat(v3.get(keyA), is("a"));
-        assertThat(v3.get(keyB), is("b"));
-        assertThat(v3.get(keyC), is(nullValue()));
+        // New version is changed
+        assertThat(v5.get(keyA), is("a"));
+        assertThat(v5.get(keyB), is(nullValue()));
+        assertThat(v5.get(keyC), is("c"));
+
+        // Original version remains unchanged:
+        assertThat(v4.get(keyA), is("a"));
+        assertThat(v4.get(keyB), is("b"));
+        assertThat(v4.get(keyC), is("c"));
+    }
+
+    @Test
+    public void removesEntryFromHeadOfCollisionChaing() {
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
+
+        TestKey keyA = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "a");
+        TestKey keyB = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "b");
+        TestKey keyC = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "c");
+
+        PersistentMap<TestKey, String> v2 = v1.put(keyA, "a");
+        PersistentMap<TestKey, String> v3 = v2.put(keyB, "b");
+        PersistentMap<TestKey, String> v4 = v3.put(keyC, "c");
+
+        PersistentMap<TestKey, String> v5 = v4.remove(keyC);
+
+        System.out.println(v5.dump());
+
+        // New version is changed
+        assertThat(v5.get(keyA), is("a"));
+        assertThat(v5.get(keyB), is("b"));
+        assertThat(v5.get(keyC), is(nullValue()));
+
+        // Original version remains unchanged:
+        assertThat(v4.get(keyA), is("a"));
+        assertThat(v4.get(keyB), is("b"));
+        assertThat(v4.get(keyC), is("c"));
+    }
+
+    @Test
+    public void removesEntryFromTailOfCollisionChaing() {
+        PersistentMap<TestKey, String> v1 = PersistentMap.create();
+
+        TestKey keyA = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "a");
+        TestKey keyB = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "b");
+        TestKey keyC = hashCodes.key(0, 1, 2, 3, 4, 5, 3, "c");
+
+        PersistentMap<TestKey, String> v2 = v1.put(keyA, "a");
+        PersistentMap<TestKey, String> v3 = v2.put(keyB, "b");
+        PersistentMap<TestKey, String> v4 = v3.put(keyC, "c");
+
+        PersistentMap<TestKey, String> v5 = v4.remove(keyA);
+
+        System.out.println(v5.dump());
+
+        // New version is changed
+        assertThat(v5.get(keyA), is(nullValue()));
+        assertThat(v5.get(keyB), is("b"));
+        assertThat(v5.get(keyC), is("c"));
+
+        // Original version remains unchanged:
+        assertThat(v4.get(keyA), is("a"));
+        assertThat(v4.get(keyB), is("b"));
+        assertThat(v4.get(keyC), is("c"));
     }
 
     @Test
@@ -343,5 +440,4 @@ public class PersistentMapTest {
     private String randomString() {
         return String.format("%04x%04x%04x%04x", r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt());
     }
-
 }

@@ -58,9 +58,7 @@ public final class PersistentMap<K, V> {
         if (levelTo == 7) {
             // Key collision occurred:
             levelTo--;
-            KeyEntry<K, V> oldKv = new KeyEntry<>(oldKeyEntry.key(), oldKeyEntry.value());
-            KeyEntry<K, V> newKv = new KeyEntry<>(key, value);
-            newKv.next(oldKv);
+            KeyEntry<K, V> newKv = new KeyEntry<>(key, value, oldKeyEntry);
             subMap = new SubMap(subhashForLevel(oldHashCode, levelTo--), newKv);
         } else {
             KeyEntry<K, V> newKv = new KeyEntry<>(key, value);
@@ -102,7 +100,12 @@ public final class PersistentMap<K, V> {
 
         Object entry = root.get(bucket);
         if (isKeyValue(entry)) {
-            return root.removeEntry(bucket);
+            KeyEntry kvEntry = (KeyEntry) root.get(bucket);
+            if (kvEntry.next() == null) {
+                return root.removeEntry(bucket);
+            } else {
+                return root.replace(bucket, removeEntryFromChain(key, kvEntry));
+            }
         } else if (isSubmap(entry)) {
             SubMap subMap = (SubMap) entry;
             SubMap copy = removeKey(subMap, level + 1, key);
@@ -114,6 +117,14 @@ public final class PersistentMap<K, V> {
         }
 
         return null;
+    }
+
+    private KeyEntry<K, V> removeEntryFromChain(K key, KeyEntry<K, V> root) {
+        if (!key.equals(root.key())) {
+            return new KeyEntry<>(root.key(), root.value(), removeEntryFromChain(key, root.next()));
+        } else {
+            return root.next();
+        }
     }
 
     public PersistentMap<K, V> remove(K key) {
@@ -262,16 +273,16 @@ public final class PersistentMap<K, V> {
     static class KeyEntry<K, V> implements Map.Entry<K, V> {
         private final K key;
         private final V value;
-        private KeyEntry<K, V> next;
+        private final KeyEntry<K, V> next;
 
         public KeyEntry(K key, V value) {
-            this.key = key;
-            this.value = value;
-            this.next = null;
+            this(key, value, null);
         }
 
-        void next(KeyEntry<K, V> nextValue) {
-            this.next = nextValue;
+        public KeyEntry(K key, V value, KeyEntry<K, V> next) {
+            this.key = key;
+            this.value = value;
+            this.next = next;
         }
 
         KeyEntry<K, V> next() {
