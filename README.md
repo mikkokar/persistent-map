@@ -30,6 +30,15 @@ It supports all the basic operations:
   String barVal = v4.get("bar")
   ```
   
+To enumerate keySet, values, and entries:
+
+  ```
+  Set<K> keys = v4.keySet();
+  List<V> values = v4.values();
+  Set<Map.Entry<K, V>> entries = v4.entrySet();
+  ```
+
+
 See the PersistentMapTest.java for usage examples.  
   
 Installation:
